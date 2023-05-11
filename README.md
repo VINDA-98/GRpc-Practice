@@ -1,25 +1,24 @@
 # gRpc_study
-gRPC 学习 ，安装命令如下：
-# go编译工具 最新版
+### go编译工具 最新版
 go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 
 将proto文件编译为任何语言的文件
 
-# 指定版本
+### 指定版本
 go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.3.0
 
 可以使用下面的命令来生成代码
 $ protoc --proto_path=src --go_out=out --go_opt=paths=source_relative foo.proto bar/baz.proto
 
 
-# ProtoBuf 安装
+### ProtoBuf 安装
 V3 版本： `https://github.com/protocolbuffers/ProtoBuf/releases`
 
 Mac快速安装：
 `brew install ProtoBuf`
 
 
-# proto文件初始化
+# proto项目初始化
 [hello.proto](protocol%2Fproto%2Fhello.proto)
 ```protobuf
 syntax = "proto3";  //定义pb版本号
@@ -109,7 +108,7 @@ message ListArticle {
 
 
 
-# 编译命令解析
+### 编译命令解析
 protoc --go_out=./protocol protocol/proto/*.proto
 
 ./protocol 输出pb.go文件的目录相对路径
@@ -127,7 +126,7 @@ protocol/proto/*.proto 表示需要被编译的 .proto 文件
   --ruby_out=OUT_DIR          指定代码生成目录，生成 ruby 代码
 ```
 
-## 运行程序
+# 运行程序
 ```shell
 go build -o gRpcTest
 ./gRpcTest
@@ -138,4 +137,116 @@ go build -o gRpcTest
 ```shell
 chmod a+x start.sh
 bash start.sh
+```
+
+
+# RPC 远程过程调用
+### 与HTTP对比
+RPC主要用于公司内部的服务调用，性能消耗低，传输效率高，服务治理方便。
+
+HTTP主要用于对外的异构环境，浏览器接口调用，APP接口调用，第三方接口调用等。
+
+### 优势
+RPC能够跨多种开发工具和平台
+
+RPC能够跨语言调用
+
+RPC能够提高系统的可扩展性，解耦，提高复用
+
+RPC相较于HTTP，传输效率更高，性能消耗更小，自带负载均衡策略，自动实现服务治理
+
+
+### 服务端
+[server.go](rpc_server%2Fserver.go)
+```go
+package rpc_server
+
+type Arity struct {
+}
+
+// ArityRequest 请求结构体
+type ArityRequest struct {
+	Name     string
+	Birthday string //生辰八字
+}
+
+// ArityResponse 响应结构体
+type ArityResponse struct {
+	Level string
+	Title string
+	Score map[string]int //最后成绩
+
+}
+
+// CalcBirthday 算命
+func (a *Arity) CalcBirthday(req ArityRequest, resp *ArityResponse) error {
+	resp.Level = req.Name + ":  绚烂钻石"
+	resp.Title = req.Name + "乃是天选之人"
+	scope := make(map[string]int, 2)
+	scope["幸运指数"] = 10
+	scope["倒霉指数"] = 2
+	resp.Score = scope
+	return nil
+}
+
+```
+
+启动和关闭server服务
+[start.go](rpc_server%2Fstart.go)
+```go
+package rpc_server
+
+import (
+	"fmt"
+	"log"
+	"net"
+	"net/http"
+	"net/rpc"
+	"os"
+)
+
+// @Title  rpc_server
+// @Description  MyGO
+// @Author  WeiDa  2023/5/11 16:34
+// @Update  WeiDa  2023/5/11 16:34
+
+type RpcServer struct {
+	Listener net.Listener
+}
+
+func (s *RpcServer) StartServer() {
+
+	//注册rpc服务
+	err := rpc.Register(new(Arity))
+	if err != nil {
+		log.Fatalln("Register error:", err)
+	}
+
+	rpc.HandleHTTP() //采用http协议作为rpc载体
+
+	s.Listener, err = net.Listen("tcp", "127.0.0.1:8088")
+	if err != nil {
+		log.Fatalln("Listen error:", err)
+	}
+
+	_, _ = fmt.Fprintf(os.Stdout, "%s", "正在新建RPC服务...\n")
+
+	//常规启动http服务
+	err = http.Serve(s.Listener, nil)
+	if err != nil {
+		return
+	}
+
+}
+
+func (s *RpcServer) CloseServer() {
+	//关闭rpc服务
+	err := s.Listener.Close()
+	if err != nil {
+		log.Fatalln("CloseServer error:", err)
+	}
+
+	log.Println("正在关闭RPC服务...")
+}
+
 ```
