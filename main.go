@@ -6,5 +6,5 @@ package main
 // @Update  WeiDa  2023/5/10 18:43
 
 func main() {
-
+	practice1()
 }
