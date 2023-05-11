@@ -155,6 +155,9 @@ RPC能够提高系统的可扩展性，解耦，提高复用
 
 RPC相较于HTTP，传输效率更高，性能消耗更小，自带负载均衡策略，自动实现服务治理
 
+### 添加grpc相关依赖
+`go get google.golang.org/grpc`
+
 
 ### 服务端
 [server.go](rpc_server%2Fserver.go)
