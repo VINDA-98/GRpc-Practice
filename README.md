@@ -1,14 +1,11 @@
 # gRpc_study
 ### go编译工具 最新版
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+`go install google.golang.org/protobuf/cmd/protoc-gen-go@latest`
 
 将proto文件编译为任何语言的文件
 
 ### 指定版本
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.3.0
-
-可以使用下面的命令来生成代码
-$ protoc --proto_path=src --go_out=out --go_opt=paths=source_relative foo.proto bar/baz.proto
+`go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.3.0`
 
 
 ### ProtoBuf 安装
@@ -20,6 +17,7 @@ Mac快速安装：
 
 # proto项目初始化
 [hello.proto](protocol%2Fproto%2Fhello.proto)
+
 ```protobuf
 syntax = "proto3";  //定义pb版本号
 
@@ -70,9 +68,22 @@ message ListQuote {
   Other others = 2;
 }
 
+
+service Greeter {  //service 定义的服务
+  rpc SayHello (HelloRequest) returns (HelloReply) {}  //定义服务的方法
+}
+
+message HelloRequest { //Hello请求体
+  string name = 1;
+}
+
+message HelloReply {  //Hello返回体
+  string message = 1;
+}
+
 ```
 
-导入其他proto文件
+## 导入其他proto文件
 
 [article.proto](protocol%2Fproto%2Farticle.proto)
 ```protobuf
@@ -108,13 +119,14 @@ message ListArticle {
 
 
 
-### 编译命令解析
-protoc --go_out=./protocol protocol/proto/*.proto
+## 编译命令解析
+`protoc --go_out=./protocol protocol/proto/*.proto`
 
-./protocol 输出pb.go文件的目录相对路径
-protocol/proto/*.proto 表示需要被编译的 .proto 文件
 
 ```text
+    ./protocol 输出pb.go文件的目录相对路径
+    protocol/proto/*.proto 表示需要被编译的 .proto 文件
+
   --go_out=OUT_DIR            指定代码生成目录，生成 Go 代码
   --cpp_out=OUT_DIR           指定代码生成目录，生成 C++ 代码
   --csharp_out=OUT_DIR        指定代码生成目录，生成 C# 代码
