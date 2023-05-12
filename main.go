@@ -18,28 +18,44 @@ func main() {
 	server := &rpc_server.RpcServer{}
 	quitMain := make(chan bool) //阻塞main goroutine,等待for select 处理完成
 
-	go server.StartServer()
+	go func() {
+		_ = server.StartServer()
+	}()
+	go func() {
+		_ = server.StartGRPCServer()
+	}()
 
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 2)
 	//启动rpc客户端
 	client := &rpc_client.RpcClient{}
 	_ = client.StartClient()
+	_ = client.StartGRPCClient()
 
 	// 定义一个定时器，3S后自动请求rpc服务端
-	ticker := time.NewTicker(time.Second * 2)
+	ticker1 := time.NewTicker(time.Second * 2)
 	go func() {
 		for {
 			select {
 			//启动3S后，开始请求
-			case <-ticker.C:
+			case <-ticker1.C:
 				for i := 0; i < 3; i++ {
 					err := client.SendClient()
 					if err != nil {
 						log.Println("SendClient:", err)
 					}
+					//err = client.SendGRPCClient()
+					//if err != nil {
+					//	log.Println("SendGRPCClient:", err)
+					//}
 				}
 				_ = client.CloseClient()
-				server.CloseServer()
+				_ = client.CloseGRPCClient()
+				err := server.CloseServer()
+				if err != nil {
+					return
+				}
+				_ = server.CloseGRPCServer()
+
 				quitMain <- true
 			}
 		}

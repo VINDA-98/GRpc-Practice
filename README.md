@@ -128,6 +128,8 @@ protocol/proto/*.proto 表示需要被编译的 .proto 文件
 
 # 运行程序
 ```shell
+# 注意 --go-grpc_out 参数，生成文件是hello_grpc.pb.go，符合go语言在RPC的文件
+protoc -I ./protocol --go-grpc_out=./protocol  ./protocol/proto/*.proto 
 go build -o gRpcTest
 ./gRpcTest
 ```
@@ -156,7 +158,10 @@ RPC能够提高系统的可扩展性，解耦，提高复用
 RPC相较于HTTP，传输效率更高，性能消耗更小，自带负载均衡策略，自动实现服务治理
 
 ### 添加grpc相关依赖
-`go get google.golang.org/grpc`
+```shell
+go get google.golang.org/grpc/cmd/protoc-gen-go-grpc
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
+```
 
 
 ### 服务端
@@ -195,6 +200,7 @@ func (a *Arity) CalcBirthday(req ArityRequest, resp *ArityResponse) error {
 ```
 
 启动和关闭server服务
+
 [start.go](rpc_server%2Fstart.go)
 ```go
 package rpc_server
@@ -253,3 +259,7 @@ func (s *RpcServer) CloseServer() {
 }
 
 ```
+
+
+### 常见错误
+`code = DeadlineExceeded desc = context deadline exceeded` 请求超过超时时间

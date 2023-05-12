@@ -12,6 +12,14 @@ func TestRpcServer(t *testing.T) {
 	server.StartServer()
 }
 
+func TestGRpcServer(t *testing.T) {
+	server := &rpc_server.RpcServer{}
+	err := server.StartGRPCServer()
+	if err != nil {
+		return
+	}
+}
+
 func TestRpcClient(t *testing.T) {
 	//启动rpc客户端
 	client := &rpc_client.RpcClient{}

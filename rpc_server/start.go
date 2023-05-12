@@ -2,13 +2,12 @@ package rpc_server
 
 import (
 	"context"
-	"fmt"
 	"github.com/VINDA-98/gRpc_study/protocol"
+	grpc "google.golang.org/grpc"
 	"log"
 	"net"
 	"net/http"
 	"net/rpc"
-	"os"
 )
 
 // @Title  rpc_server
@@ -17,63 +16,76 @@ import (
 // @Update  WeiDa  2023/5/11 16:34
 
 type RpcServer struct {
-	Listener net.Listener
-	//protocol.UnimplementedGreeterServer
+	Listener net.Listener //监听服务
+	GRpc     *grpc.Server //GRPC服务
+	protocol.UnimplementedGreeterServer
 }
 
-func (s *RpcServer) StartServer() {
+func (s *RpcServer) StartServer() (err error) {
 
 	//注册rpc服务
-	err := rpc.Register(new(Arity))
+	err = rpc.Register(new(Arity))
 	if err != nil {
 		log.Fatalln("Register error:", err)
 	}
 
 	rpc.HandleHTTP() //采用http协议作为rpc载体
 
-	s.Listener, err = net.Listen("tcp", "127.0.0.1:8088")
+	s.Listener, err = net.Listen("tcp", "127.0.0.1:10000")
 	if err != nil {
 		log.Fatalln("Listen error:", err)
 	}
 
-	_, _ = fmt.Fprintf(os.Stdout, "%s", "正在新建RPC服务...\n")
+	log.Printf("正在新建RPC服务...%s\n", s.Listener.Addr())
 
 	//常规启动http服务
 	err = http.Serve(s.Listener, nil)
+	return
+}
+
+func (s *RpcServer) CloseServer() (err error) {
+	//关闭rpc服务
+	err = s.Listener.Close()
 	if err != nil {
+		log.Println("CloseServer error:", err)
+	}
+	return
+}
+
+// StartGRPCServer 启动GRPC服务
+func (s *RpcServer) StartGRPCServer() (err error) {
+	//tcp协议监听指定端口号
+	s.Listener, err = net.Listen("tcp", "127.0.0.1:10001")
+	if err != nil {
+		log.Fatalf("StartGRPCServer Failed To Listen: %v", err)
 		return
 	}
+	//实例化gRPC服务
+	s.GRpc = grpc.NewServer()
 
-}
-
-func (s *RpcServer) CloseServer() {
-	//关闭rpc服务
-	err := s.Listener.Close()
-	if err != nil {
-		log.Fatalln("CloseServer error:", err)
+	//服务注册
+	protocol.RegisterGreeterServer(s.GRpc, s)
+	log.Printf("正在新建GRPC服务...%s\n ", s.Listener.Addr())
+	//启动服务
+	if err := s.GRpc.Serve(s.Listener); err != nil {
+		log.Fatalf("StartGRPCServer Failed to Serve: %v", err)
 	}
 
-	log.Println("正在关闭RPC服务...")
+	return
 }
 
-// SayHello implements helloworld.GreeterServer
+// CloseGRPCServer 关闭GRPC服务
+func (s *RpcServer) CloseGRPCServer() (err error) {
+	err = s.Listener.Close()
+	if err != nil {
+		return err
+	}
+	s.GRpc.Stop()
+	log.Println("正在关闭GRPC服务...")
+	return
+}
+
+// SayHello   实现hello接口 GreeterServer
 func (s *RpcServer) SayHello(ctx context.Context, in *protocol.HelloRequest) (*protocol.HelloReply, error) {
 	return &protocol.HelloReply{Message: "Hello " + in.Name}, nil
-}
-
-func (s *RpcServer) StartGRPCServer() {
-	//tcp协议监听指定端口号
-	//lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 8088))
-	//if err != nil {
-	//	log.Fatalf("failed to listen: %v", err)
-	//}
-	//实例化gRPC服务
-	//s := gRPC.NewServer()
-	////服务注册
-	//protocol.RegisterGreeterServer(s, &server{})
-	//log.Printf("server listening at %v", lis.Addr())
-	////启动服务
-	//if err := s.Serve(lis); err != nil {
-	//	log.Fatalf("failed to serve: %v", err)
-	//}
 }

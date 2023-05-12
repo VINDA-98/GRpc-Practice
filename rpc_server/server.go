@@ -28,7 +28,7 @@ func (a *Arity) CalcBirthday(req ArityRequest, resp *ArityResponse) error {
 	resp.Title = req.Name + "乃是天选之人"
 	scope := make(map[string]int, 2)
 	scope["幸运指数"] = 10
-	scope["倒霉指数"] = 2
+	scope["倒霉指数"] = 01
 	resp.Score = scope
 	return nil
 }
