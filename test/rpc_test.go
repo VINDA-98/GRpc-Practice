@@ -9,7 +9,7 @@ import (
 
 func TestRpcServer(t *testing.T) {
 	server := &rpc_server.RpcServer{}
-	server.StartServer()
+	_ = server.StartServer()
 }
 
 func TestGRpcServer(t *testing.T) {
@@ -32,4 +32,17 @@ func TestRpcClient(t *testing.T) {
 	}
 	_ = client.CloseClient()
 
+}
+
+func TestGRpcClient(t *testing.T) {
+	//启动rpc客户端
+	client := &rpc_client.RpcClient{}
+	_ = client.StartGRPCClient()
+	for i := 0; i < 3; i++ {
+		err := client.SendGRPCClient()
+		if err != nil {
+			log.Println("SendGRPCClient:", err)
+		}
+	}
+	_ = client.CloseGRPCClient()
 }

@@ -28,8 +28,10 @@ func (c *RpcClient) StartClient() (err error) {
 	}
 
 	if err != nil {
-		log.Fatalln("dialing error:", err)
+		log.Println("dialing error:", err)
+		return
 	}
+	log.Println("正在新建RPC连接...")
 	return
 }
 
@@ -55,12 +57,15 @@ func (c *RpcClient) CloseClient() (err error) {
 // StartGRPCClient 新建GRPC连接
 func (c *RpcClient) StartGRPCClient() (err error) {
 	//通过gRPC.Dial()方法建立服务连接
+	log.Println("正在新建GRPC连接...")
 	c.ClientConn, err = gRPC.Dial("127.0.0.1:10001", gRPC.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("StartGRPCClient Not Connect: %v", err)
+		log.Printf("StartGRPCClient Not Connect: %v\n", err)
+		return
 	}
 	//实例化客户端连接
 	c.GreeterClient = protocol.NewGreeterClient(c.ClientConn)
+
 	return
 }
 
@@ -83,5 +88,6 @@ func (c *RpcClient) SendGRPCClient() (err error) {
 // CloseGRPCClient 关闭GRPC连接
 func (c *RpcClient) CloseGRPCClient() (err error) {
 	err = c.ClientConn.Close()
+	log.Println("正在断开GRPC请求...")
 	return
 }

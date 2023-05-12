@@ -126,22 +126,6 @@ protocol/proto/*.proto 表示需要被编译的 .proto 文件
   --ruby_out=OUT_DIR          指定代码生成目录，生成 ruby 代码
 ```
 
-# 运行程序
-```shell
-# 注意 --go-grpc_out 参数，生成文件是hello_grpc.pb.go，符合go语言在RPC的文件
-protoc -I ./protocol --go-grpc_out=./protocol  ./protocol/proto/*.proto 
-go build -o gRpcTest
-./gRpcTest
-```
-
-或者
-
-```shell
-chmod a+x start.sh
-bash start.sh
-```
-
-
 # RPC 远程过程调用
 ### 与HTTP对比
 RPC主要用于公司内部的服务调用，性能消耗低，传输效率高，服务治理方便。
@@ -164,54 +148,33 @@ go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
 ```
 
 
-### 服务端
-[server.go](rpc_server%2Fserver.go)
-```go
-package rpc_server
+### 常见错误
+`code = DeadlineExceeded desc = context deadline exceeded` 请求超过超时时间
 
-type Arity struct {
-}
-
-// ArityRequest 请求结构体
-type ArityRequest struct {
-	Name     string
-	Birthday string //生辰八字
-}
-
-// ArityResponse 响应结构体
-type ArityResponse struct {
-	Level string
-	Title string
-	Score map[string]int //最后成绩
-
-}
-
-// CalcBirthday 算命
-func (a *Arity) CalcBirthday(req ArityRequest, resp *ArityResponse) error {
-	resp.Level = req.Name + ":  绚烂钻石"
-	resp.Title = req.Name + "乃是天选之人"
-	scope := make(map[string]int, 2)
-	scope["幸运指数"] = 10
-	scope["倒霉指数"] = 2
-	resp.Score = scope
-	return nil
-}
-
-```
-
-启动和关闭server服务
-
+# 服务端处理
 [start.go](rpc_server%2Fstart.go)
+
+需要注意以下几个点:
+
+1、结构体RpcServer需要继承protocol.UnimplementedGreeterServer结构体
+
+2、实现hello.proto中定义Greeter服务提供的SayHello()方法,保证入参和出参正确
+    
+`SayHello(ctx context.Context, in *protocol.HelloRequest) (*protocol.HelloReply, error)`
+
+3、实现GRPC服务的启动和关闭
+
 ```go
 package rpc_server
 
 import (
-	"fmt"
+	"context"
+	"github.com/VINDA-98/gRpc_study/protocol"
+	grpc "google.golang.org/grpc"
 	"log"
 	"net"
 	"net/http"
 	"net/rpc"
-	"os"
 )
 
 // @Title  rpc_server
@@ -220,46 +183,203 @@ import (
 // @Update  WeiDa  2023/5/11 16:34
 
 type RpcServer struct {
-	Listener net.Listener
+	Listener net.Listener //监听服务
+	GRpc     *grpc.Server //GRPC服务
+	protocol.UnimplementedGreeterServer
 }
 
-func (s *RpcServer) StartServer() {
+func (s *RpcServer) StartServer() (err error) {
 
 	//注册rpc服务
-	err := rpc.Register(new(Arity))
+	err = rpc.Register(new(Arity))
 	if err != nil {
 		log.Fatalln("Register error:", err)
 	}
 
 	rpc.HandleHTTP() //采用http协议作为rpc载体
 
-	s.Listener, err = net.Listen("tcp", "127.0.0.1:8088")
+	s.Listener, err = net.Listen("tcp", "127.0.0.1:10000")
 	if err != nil {
 		log.Fatalln("Listen error:", err)
 	}
 
-	_, _ = fmt.Fprintf(os.Stdout, "%s", "正在新建RPC服务...\n")
+	log.Printf("正在新建RPC服务...%s\n", s.Listener.Addr())
 
 	//常规启动http服务
 	err = http.Serve(s.Listener, nil)
-	if err != nil {
-		return
-	}
-
+	return
 }
 
-func (s *RpcServer) CloseServer() {
+func (s *RpcServer) CloseServer() (err error) {
 	//关闭rpc服务
-	err := s.Listener.Close()
+	err = s.Listener.Close()
 	if err != nil {
-		log.Fatalln("CloseServer error:", err)
+		log.Println("CloseServer error:", err)
+	}
+	return
+}
+
+// StartGRPCServer 启动GRPC服务
+func (s *RpcServer) StartGRPCServer() (err error) {
+	//tcp协议监听指定端口号
+	s.Listener, err = net.Listen("tcp", "127.0.0.1:10001")
+	if err != nil {
+		log.Fatalf("StartGRPCServer Failed To Listen: %v", err)
+		return
+	}
+	//实例化gRPC服务
+	s.GRpc = grpc.NewServer()
+
+	//服务注册
+	protocol.RegisterGreeterServer(s.GRpc, s)
+	log.Printf("正在新建GRPC服务...%s\n ", s.Listener.Addr())
+	//启动服务
+	if err := s.GRpc.Serve(s.Listener); err != nil {
+		log.Fatalf("StartGRPCServer Failed to Serve: %v", err)
 	}
 
-	log.Println("正在关闭RPC服务...")
+	return
+}
+
+// CloseGRPCServer 关闭GRPC服务
+func (s *RpcServer) CloseGRPCServer() (err error) {
+	err = s.Listener.Close()
+	if err != nil {
+		return err
+	}
+	s.GRpc.Stop()
+	log.Println("正在关闭GRPC服务...")
+	return
+}
+
+// SayHello   实现hello接口 GreeterServer
+func (s *RpcServer) SayHello(ctx context.Context, in *protocol.HelloRequest) (*protocol.HelloReply, error) {
+	return &protocol.HelloReply{Message: "Hello " + in.Name}, nil
 }
 
 ```
 
 
-### 常见错误
-`code = DeadlineExceeded desc = context deadline exceeded` 请求超过超时时间
+# 客户端
+[start.go](rpc_client%2Fstart.go)
+
+需要注意以下几个点:
+
+1、c.GreeterClient = protocol.NewGreeterClient(c.ClientConn) 得到GRPC新的连接
+
+2、c.GreeterClient.SayHello(ctx, &protocol.HelloRequest{Name: "VinDa"}) 发起调用，等待响应
+
+3、实现服务的新建请和关闭请求
+
+```go
+package rpc_client
+
+import (
+	"context"
+	"github.com/VINDA-98/gRpc_study/protocol"
+	gRPC "google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"log"
+	"net/rpc"
+	"time"
+)
+
+// @Title  rpc_server
+// @Description  MyGO
+// @Author  WeiDa  2023/5/11 16:34
+// @Update  WeiDa  2023/5/11 16:34
+
+type RpcClient struct {
+	Client        *rpc.Client
+	ClientConn    *gRPC.ClientConn
+	GreeterClient protocol.GreeterClient
+}
+
+func (c *RpcClient) StartClient() (err error) {
+	c.Client, err = rpc.DialHTTP("tcp", "127.0.0.1:10000")
+	if err != nil {
+		return
+	}
+
+	if err != nil {
+		log.Println("dialing error:", err)
+		return
+	}
+	log.Println("正在新建RPC连接...")
+	return
+}
+
+func (c *RpcClient) SendClient() (err error) {
+	req := ArityRequest{"VinDa", "9898"}
+	var res ArityResponse
+
+	err = c.Client.Call("Arity.CalcBirthday", req, &res) //运筹帷幄，调用算命方法
+	if err != nil {
+		log.Fatalln("Call Arity.CalcBirthday error:", err)
+		return
+	}
+	log.Printf("正在验证: %s  %s 的身份信息,返回内容: %s,%s,%v\n", req.Name, req.Birthday, res.Level, res.Title, res.Score)
+	return nil
+}
+
+func (c *RpcClient) CloseClient() (err error) {
+	err = c.Client.Close()
+	log.Println("正在断开RPC请求...")
+	return
+}
+
+// StartGRPCClient 新建GRPC连接
+func (c *RpcClient) StartGRPCClient() (err error) {
+	//通过gRPC.Dial()方法建立服务连接
+	log.Println("正在新建GRPC连接...")
+	c.ClientConn, err = gRPC.Dial("127.0.0.1:10001", gRPC.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Printf("StartGRPCClient Not Connect: %v\n", err)
+		return
+	}
+	//实例化客户端连接
+	c.GreeterClient = protocol.NewGreeterClient(c.ClientConn)
+
+	return
+}
+
+// SendGRPCClient 发送请求信息
+func (c *RpcClient) SendGRPCClient() (err error) {
+	//设置请求上下文，因为是网络请求，我们需要设置超时时间
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	defer cancel()
+
+	//客户端调用在proto中定义的SayHello()rpc方法，发起请求，接收服务端响应
+	r, err := c.GreeterClient.SayHello(ctx, &protocol.HelloRequest{Name: "VinDa"})
+	if err != nil {
+		log.Printf("StartGRPCClient Could Not Greet: %v", err)
+		return
+	}
+	log.Printf("Greeting: %s", r.GetMessage())
+	return
+}
+
+// CloseGRPCClient 关闭GRPC连接
+func (c *RpcClient) CloseGRPCClient() (err error) {
+	err = c.ClientConn.Close()
+	log.Println("正在断开GRPC请求...")
+	return
+}
+
+```
+
+
+# 运行程序
+```shell
+# 注意 --go-grpc_out 参数，生成文件是hello_grpc.pb.go，符合go语言在RPC的文件
+protoc -I ./protocol --go-grpc_out=./protocol  ./protocol/proto/*.proto 
+go build -o gRpcTest
+./gRpcTest
+```
+
+或者
+
+```shell
+chmod a+x start.sh
+bash start.sh
+```

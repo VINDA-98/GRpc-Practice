@@ -15,47 +15,47 @@ import (
 func main() {
 	practice1()
 	//启动rpc服务端
-	server := &rpc_server.RpcServer{}
+	serverRPC := &rpc_server.RpcServer{}
+	serverGRPC := &rpc_server.RpcServer{}
 	quitMain := make(chan bool) //阻塞main goroutine,等待for select 处理完成
 
 	go func() {
-		_ = server.StartServer()
+		_ = serverRPC.StartServer()
 	}()
 	go func() {
-		_ = server.StartGRPCServer()
+		_ = serverGRPC.StartGRPCServer()
 	}()
 
 	time.Sleep(time.Second * 2)
 	//启动rpc客户端
-	client := &rpc_client.RpcClient{}
-	_ = client.StartClient()
-	_ = client.StartGRPCClient()
+	clientRPC := &rpc_client.RpcClient{}
+	clientGRPC := &rpc_client.RpcClient{}
+	_ = clientRPC.StartClient()
+	_ = clientGRPC.StartGRPCClient()
 
 	// 定义一个定时器，3S后自动请求rpc服务端
 	ticker1 := time.NewTicker(time.Second * 2)
+
 	go func() {
 		for {
 			select {
 			//启动3S后，开始请求
 			case <-ticker1.C:
+				ticker1.Stop()
 				for i := 0; i < 3; i++ {
-					err := client.SendClient()
+					err := clientRPC.SendClient()
 					if err != nil {
 						log.Println("SendClient:", err)
 					}
-					//err = client.SendGRPCClient()
-					//if err != nil {
-					//	log.Println("SendGRPCClient:", err)
-					//}
+					err = clientGRPC.SendGRPCClient()
+					if err != nil {
+						log.Println("SendGRPCClient:", err)
+					}
 				}
-				_ = client.CloseClient()
-				_ = client.CloseGRPCClient()
-				err := server.CloseServer()
-				if err != nil {
-					return
-				}
-				_ = server.CloseGRPCServer()
-
+				_ = clientRPC.CloseClient()
+				_ = clientGRPC.CloseGRPCClient()
+				_ = serverRPC.CloseServer()
+				_ = serverGRPC.CloseGRPCServer()
 				quitMain <- true
 			}
 		}

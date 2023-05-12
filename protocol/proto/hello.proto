@@ -52,10 +52,10 @@ service Greeter {  //service 定义的服务
   rpc SayHello (HelloRequest) returns (HelloReply) {}  //定义服务的方法
 }
 
-message HelloRequest {
+message HelloRequest { //Hello请求体
   string name = 1;
 }
 
-message HelloReply {
+message HelloReply {  //Hello返回体
   string message = 1;
 }
